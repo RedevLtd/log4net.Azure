@@ -94,16 +94,20 @@ namespace log4net.Appender
         private void ProcessEvent(LoggingEvent loggingEvent)
         {
             CloudAppendBlob appendBlob = _cloudBlobContainer.GetAppendBlobReference(Filename(_directoryName));
-            var xml = _lineFeed + loggingEvent.GetXmlString(Layout);
-            using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(xml)))
+
+            using (TextWriter tw = new StringWriter())
             {
-                appendBlob.AppendBlock(ms);
+                Layout.Format(tw, loggingEvent);
+                using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(tw.ToString())))
+                {
+                    appendBlob.AppendBlock(ms);
+                }
             }
         }
 
         private static string Filename(string directoryName)
         {
-            return string.Format("{0}/{1}.entry.log.xml",
+            return string.Format("{0}/{1}.entry.log",
                                  directoryName,
                                  DateTime.Today.ToString("yyyy_MM_dd",
                                                                  DateTimeFormatInfo.InvariantInfo));
