@@ -9,6 +9,7 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using log4net.Appender.Language;
 using log4net.Core;
+using log4net.Layout;
 using Microsoft.Azure;
 
 namespace log4net.Appender
@@ -74,36 +75,50 @@ namespace log4net.Appender
         }
 
         /// <summary>
-        /// Sends the events.
+        /// Sends the logEvents.
         /// </summary>
-        /// <param name="events">The events that need to be send.</param>
+        /// <param name="logEvents">The logEvents that need to be send.</param>
         /// <remarks>
         /// <para>
-        /// The subclass must override this method to process the buffered events.
+        /// The subclass must override this method to process the buffered logEvents.
         /// </para>
         /// </remarks>
         protected override void SendBuffer(LoggingEvent[] events)
         {
             CloudAppendBlob appendBlob = _cloudBlobContainer.GetAppendBlobReference(Filename(_directoryName));
-            if (!appendBlob.Exists()) appendBlob.CreateOrReplace();
-            else _lineFeed = Environment.NewLine;
 
-            Parallel.ForEach(events, ProcessEvent);
-        }
-
-        private void ProcessEvent(LoggingEvent loggingEvent)
-        {
-            CloudAppendBlob appendBlob = _cloudBlobContainer.GetAppendBlobReference(Filename(_directoryName));
+            if (!appendBlob.Exists())
+            {
+                appendBlob.CreateOrReplace();
+            }
+            else
+            {
+                _lineFeed = Environment.NewLine;
+            }
 
             using (TextWriter tw = new StringWriter())
             {
-                Layout.Format(tw, loggingEvent);
+                foreach (var item in events)
+                    Layout.Format(tw, item);
+
                 using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(tw.ToString())))
-                {
                     appendBlob.AppendBlock(ms);
-                }
             }
         }
+
+        //private void ProcessEvent(LoggingEvent loggingEvent)
+        //{
+        //    CloudAppendBlob appendBlob = _cloudBlobContainer.GetAppendBlobReference(Filename(_directoryName));
+
+        //    using (TextWriter tw = new StringWriter())
+        //    {
+        //        Layout.Format(tw, loggingEvent);
+        //        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(tw.ToString())))
+        //        {
+        //            appendBlob.AppendBlock(ms);
+        //        }
+        //    }
+        //}
 
         private static string Filename(string directoryName)
         {
@@ -137,6 +152,9 @@ namespace log4net.Appender
             _client = _account.CreateCloudBlobClient();
             _cloudBlobContainer = _client.GetContainerReference(ContainerName.ToLower());
             _cloudBlobContainer.CreateIfNotExists();
+
+            if (Layout == null)
+                Layout = new PatternLayout();
         }
     }
 }
